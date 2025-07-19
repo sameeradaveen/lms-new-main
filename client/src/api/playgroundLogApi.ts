@@ -7,6 +7,23 @@ export async function fetchPlaygroundLogs(userId: string) {
   return res.json();
 }
 
+export async function createPlaygroundLog(log: { 
+  user: string; 
+  language: string; 
+  code: string; 
+  input?: string; 
+  output?: string; 
+}) {
+  const token = localStorage.getItem('token');
+  const res = await fetch('/api/playgroundlogs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(log),
+  });
+  if (!res.ok) throw new Error((await res.json()).error || 'Failed to create playground log');
+  return res.json();
+}
+
 export async function fetchAllPlaygroundLogs() {
   const token = localStorage.getItem('token');
   const res = await fetch('/api/playgroundlogs', {

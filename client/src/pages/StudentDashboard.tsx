@@ -4,9 +4,10 @@ import { fetchCourses } from "@/api/courseApi"
 import { checkInAttendance, fetchAttendanceByUser } from "@/api/attendanceApi"
 import { fetchAssignments, submitAssignment } from "@/api/assignmentApi"
 import { fetchLiveLinks } from "@/api/liveClassApi"
-import { fetchNotifications } from "@/api/notificationApi"
+import { fetchNotifications, fetchUnreadNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "@/api/notificationApi"
 import { fetchCertificates } from "@/api/certificateApi"
 import { fetchPlaygroundLogs } from "@/api/playgroundLogApi"
+import CodePlayground from "@/components/CodePlayground"
 
 const modules = [
   "Course Content",
@@ -32,7 +33,38 @@ const StudentDashboard = () => {
   const [attendance, setAttendance] = useState<any[]>([])
   const [attLoading, setAttLoading] = useState(false)
   const [attError, setAttError] = useState("")
+  const [attSuccess, setAttSuccess] = useState("")
   const user = JSON.parse(localStorage.getItem("user") || "{}")
+
+  // Debug: Log user information
+  useEffect(() => {
+    console.log("Current user object:", user)
+    if (!user || !user._id) {
+      console.warn("User ID not found. User object:", user)
+    }
+  }, [user])
+
+  // Check if user has already checked in today
+  const hasCheckedInToday = () => {
+    if (!attendance || attendance.length === 0) return false;
+    const today = new Date().toISOString().slice(0, 10);
+    return attendance.some(record => {
+      const recordDate = new Date(record.date).toISOString().slice(0, 10);
+      return recordDate === today && record.checkedIn;
+    });
+  };
+
+  // Get today's attendance record
+  const getTodayAttendance = () => {
+    if (!attendance || attendance.length === 0) return null;
+    const today = new Date().toISOString().slice(0, 10);
+    return attendance.find(record => {
+      const recordDate = new Date(record.date).toISOString().slice(0, 10);
+      return recordDate === today && record.checkedIn;
+    });
+  };
+
+  const todayRecord = getTodayAttendance();
 
   // Assignments
   const [assignments, setAssignments] = useState<any[]>([]);
@@ -53,6 +85,7 @@ const StudentDashboard = () => {
   const [notifications, setNotifications] = useState<any[]>([])
   const [notifLoading, setNotifLoading] = useState(false)
   const [notifError, setNotifError] = useState("")
+  const [unreadCount, setUnreadCount] = useState(0)
   // Certificates
   const [certificates, setCertificates] = useState<any[]>([])
   const [certLoading, setCertLoading] = useState(false)
@@ -75,13 +108,19 @@ const StudentDashboard = () => {
 
   useEffect(() => {
     if (active === "Attendance") {
+      if (!user || !user._id) {
+        setAttError("User not found. Please log in again.")
+        return
+      }
+      
       setAttLoading(true)
+      setAttError("")
       fetchAttendanceByUser(user._id)
         .then(setAttendance)
         .catch(err => setAttError(err.message))
         .finally(() => setAttLoading(false))
     }
-  }, [active])
+  }, [active, user._id])
 
   // Fetch data for each module
   useEffect(() => {
@@ -98,9 +137,22 @@ const StudentDashboard = () => {
         .catch(err => setLiveError(err.message))
         .finally(() => setLiveLoading(false))
     } else if (active === "Notifications") {
+      if (!user || !user._id) {
+        setNotifError("User not found. Please log in again.")
+        return
+      }
+      
       setNotifLoading(true)
-      fetchNotifications(user._id)
-        .then(setNotifications)
+      setNotifError("")
+      
+      Promise.all([
+        fetchNotifications(user._id),
+        fetchUnreadNotifications(user._id)
+      ])
+        .then(([allNotifications, unreadNotifications]) => {
+          setNotifications(allNotifications)
+          setUnreadCount(unreadNotifications.length)
+        })
         .catch(err => setNotifError(err.message))
         .finally(() => setNotifLoading(false))
     } else if (active === "Certificates") {
@@ -119,18 +171,65 @@ const StudentDashboard = () => {
   }, [active])
 
   const handleCheckIn = async () => {
+    if (!user || !user._id) {
+      setAttError("User not found. Please log in again.")
+      return
+    }
+    
+    if (hasCheckedInToday()) {
+      setAttError("You have already checked in today!")
+      return
+    }
+    
+    setAttLoading(true)
     setAttError("")
+    setAttSuccess("")
+    
     try {
       await checkInAttendance(user._id, new Date().toISOString().slice(0, 10), new Date().toLocaleTimeString())
-      // Refresh attendance log
-      setAttLoading(true)
+      setAttSuccess("Attendance recorded successfully!")
+      // Refresh attendance data
       const updated = await fetchAttendanceByUser(user._id)
       setAttendance(updated)
-      setAttLoading(false)
     } catch (err: any) {
       setAttError(err.message)
+    } finally {
+      setAttLoading(false)
     }
   }
+
+  const handleMarkNotificationAsRead = async (notificationId: string) => {
+    try {
+      await markNotificationAsRead(notificationId);
+      // Update the notification in the list
+      setNotifications(notifications.map(notif => 
+        notif._id === notificationId ? { ...notif, isRead: true } : notif
+      ));
+      // Update unread count
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err: any) {
+      console.error('Failed to mark notification as read:', err);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    if (!user || !user._id) return;
+    
+    try {
+      await markAllNotificationsAsRead(user._id);
+      // Update all notifications to read
+      setNotifications(notifications.map(notif => ({ ...notif, isRead: true })));
+      setUnreadCount(0);
+    } catch (err: any) {
+      console.error('Failed to mark all notifications as read:', err);
+    }
+  };
+
+  const handleCodeSubmit = (code: string, language: string, output: string) => {
+    // This will be used when submitting code from playground to assignments
+    console.log('Code submitted from playground:', { code, language, output });
+    // You can implement assignment submission logic here
+  };
 
   // Assignment submission handler
   const handleAssignmentSubmit = async (assignmentId: string, type: string) => {
@@ -216,23 +315,75 @@ const StudentDashboard = () => {
           </div>
         ) : active === "Attendance" ? (
           <div>
-            <button
-              onClick={handleCheckIn}
-              className="mb-4 px-6 py-2 rounded font-semibold shadow" style={{ backgroundColor: '#388bff', color: '#fff' }}
-            >
-              Check In
-            </button>
-            {attLoading && <div>Loading...</div>}
+            <div className="mb-6 p-4 rounded shadow" style={{ backgroundColor: '#23293b', color: '#fff' }}>
+              <h4 className="text-lg font-bold mb-4" style={{ color: '#388bff' }}>Daily Check-in</h4>
+              <p className="mb-4 text-sm" style={{ color: '#b0c4de' }}>
+                Click the button below to mark your attendance for today. 
+                <strong> Only one check-in per day is allowed.</strong> 
+                If you've already checked in today, the button will be disabled.
+              </p>
+              
+              {/* Debug: Show user info */}
+              <div className="mb-4 p-3 rounded" style={{ backgroundColor: '#1a1e2a', color: '#b0c4de' }}>
+                <p className="text-sm"><strong>User ID:</strong> {user._id || 'Not found'}</p>
+                <p className="text-sm"><strong>Username:</strong> {user.username || 'Not found'}</p>
+                <p className="text-sm"><strong>Role:</strong> {user.role || 'Not found'}</p>
+                <p className="text-sm">
+                  <strong>Today's Status:</strong> 
+                  <span className={`ml-2 px-2 py-1 rounded text-xs ${hasCheckedInToday() ? 'bg-green-600' : 'bg-yellow-600'}`}>
+                    {hasCheckedInToday() 
+                      ? `✅ Checked In at ${todayRecord?.time || 'N/A'}` 
+                      : '⏰ Not Checked In'
+                    }
+                  </span>
+                </p>
+              </div>
+              
+              <button
+                onClick={handleCheckIn}
+                className="px-6 py-3 rounded font-semibold shadow text-lg" 
+                style={{ backgroundColor: '#388bff', color: '#fff' }}
+                disabled={!user._id || hasCheckedInToday()}
+              >
+                {!user._id ? 'Please log in again' : hasCheckedInToday() ? 'Already checked in today' : 'Check In Today'}
+              </button>
+            </div>
+
+            <h4 className="text-lg font-bold mb-4" style={{ color: '#388bff' }}>Attendance History</h4>
+            {attLoading && <div>Loading attendance records...</div>}
             {attError && <div className="text-red-500">{attError}</div>}
-            <ul className="space-y-2 mt-4">
-              {attendance.map((rec) => (
-                <li key={rec._id} className="p-2 rounded shadow flex justify-between mb-2" style={{ backgroundColor: '#23293b', color: '#fff' }}>
-                  <span>{rec.date?.slice(0, 10)}</span>
-                  <span>{rec.time}</span>
-                  <span>{rec.checkedIn ? "Present" : "Absent"}</span>
-                </li>
-              ))}
-            </ul>
+            {attSuccess && <div className="text-green-500">{attSuccess}</div>}
+            {!attLoading && !attError && attendance.length === 0 && (
+              <div className="text-center py-8" style={{ color: '#b0c4de' }}>
+                No attendance records found. Check in to start tracking your attendance!
+              </div>
+            )}
+            {!attLoading && !attError && attendance.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full bg-gray-800 text-white rounded-lg shadow-md">
+                  <thead>
+                    <tr style={{ backgroundColor: '#1a1e2a', color: '#388bff' }}>
+                      <th className="py-2 px-4">Date</th>
+                      <th className="py-2 px-4">Time</th>
+                      <th className="py-2 px-4">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {attendance.map((rec) => (
+                      <tr key={rec._id} style={{ backgroundColor: '#23293b', color: '#fff' }}>
+                        <td className="py-2 px-4">{new Date(rec.date).toLocaleDateString()}</td>
+                        <td className="py-2 px-4">{rec.time || 'N/A'}</td>
+                        <td className="py-2 px-4">
+                          <span className={`px-2 py-1 rounded text-xs ${rec.checkedIn ? 'bg-green-600' : 'bg-red-600'}`}>
+                            {rec.checkedIn ? 'Present' : 'Absent'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         ) : active === 'Assignments' && (
           <div className="mb-8">
@@ -295,31 +446,156 @@ const StudentDashboard = () => {
         )}
         {active === "Live Class Links" ? (
           <div>
-            {liveLoading && <div>Loading...</div>}
+            <h4 className="text-lg font-bold mb-4" style={{ color: '#388bff' }}>Live Class Links</h4>
+            {liveLoading && <div>Loading live class links...</div>}
             {liveError && <div className="text-red-500">{liveError}</div>}
-            {liveLinks.length === 0 && !liveLoading ? <div>No live class links.</div> : null}
-            <ul className="space-y-2 mt-4">
-              {liveLinks.map((link) => (
-                <li key={link._id} className="p-2 bg-white dark:bg-gray-800 rounded shadow flex justify-between items-center">
-                  <span className="font-semibold">{link.title}</span>
-                  <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Join</a>
-                </li>
-              ))}
-            </ul>
+            {!liveLoading && !liveError && liveLinks.length === 0 && (
+              <div className="text-center py-8" style={{ color: '#b0c4de' }}>
+                No live class links available at the moment.
+              </div>
+            )}
+            {!liveLoading && !liveError && liveLinks.length > 0 && (
+              <div className="grid gap-4">
+                {liveLinks.map((link) => (
+                  <div key={link._id} className="p-4 rounded shadow" style={{ backgroundColor: '#23293b', color: '#fff' }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-semibold" style={{ color: '#388bff' }}>{link.title}</span>
+                        <span className={`px-2 py-1 rounded text-xs ${link.active ? 'bg-green-600' : 'bg-red-600'}`}>
+                          {link.active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm" style={{ color: '#b0c4de' }}>
+                          {link.platform === 'Google Meet' && '🔵 Google Meet'}
+                          {link.platform === 'Zoom' && '🔴 Zoom'}
+                          {link.platform === 'Microsoft Teams' && '🟣 Teams'}
+                          {link.platform === 'Other' && '⚪ Other'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {link.description && (
+                      <p className="mb-2 text-sm" style={{ color: '#b0c4de' }}>{link.description}</p>
+                    )}
+                    
+                    {link.scheduledDate && (
+                      <p className="mb-2 text-sm" style={{ color: '#b0c4de' }}>
+                        📅 Scheduled: {new Date(link.scheduledDate).toLocaleDateString()} 
+                        {link.scheduledTime && ` at ${link.scheduledTime}`}
+                      </p>
+                    )}
+                    
+                    <div className="flex items-center gap-2">
+                      <a 
+                        href={link.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="px-4 py-2 rounded font-semibold shadow inline-flex items-center gap-2" 
+                        style={{ backgroundColor: '#388bff', color: '#fff' }}
+                      >
+                        🎥 Join Meeting
+                      </a>
+                      <span className="text-xs" style={{ color: '#b0c4de' }}>
+                        Created by: {link.createdBy?.username || 'Admin'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : active === "Notifications" ? (
           <div>
-            {notifLoading && <div>Loading...</div>}
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-bold" style={{ color: '#388bff' }}>Notifications</h4>
+              {unreadCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm" style={{ color: '#b0c4de' }}>
+                    {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
+                  </span>
+                  <button 
+                    onClick={handleMarkAllAsRead}
+                    className="px-3 py-1 rounded text-sm" 
+                    style={{ backgroundColor: '#388bff', color: '#fff' }}
+                  >
+                    Mark All as Read
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            {notifLoading && <div>Loading notifications...</div>}
             {notifError && <div className="text-red-500">{notifError}</div>}
-            {notifications.length === 0 && !notifLoading ? <div>No notifications.</div> : null}
-            <ul className="space-y-2 mt-4">
-              {notifications.map((n) => (
-                <li key={n._id} className="p-2 bg-white dark:bg-gray-800 rounded shadow flex justify-between">
-                  <span>{n.message}</span>
-                  <span className="text-xs text-gray-400">{new Date(n.createdAt).toLocaleString()}</span>
-                </li>
-              ))}
-            </ul>
+            {!notifLoading && !notifError && notifications.length === 0 && (
+              <div className="text-center py-8" style={{ color: '#b0c4de' }}>
+                No notifications available.
+              </div>
+            )}
+            {!notifLoading && !notifError && notifications.length > 0 && (
+              <div className="space-y-4">
+                {notifications.map((notification) => (
+                  <div 
+                    key={notification._id} 
+                    className={`p-4 rounded shadow border-l-4 ${
+                      !notification.isRead ? 'border-l-blue-500' : 'border-l-gray-500'
+                    }`} 
+                    style={{ 
+                      backgroundColor: notification.isRead ? '#1a1e2a' : '#23293b', 
+                      color: '#fff' 
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-lg font-semibold ${!notification.isRead ? 'font-bold' : ''}`} style={{ color: '#388bff' }}>
+                          {notification.title}
+                        </span>
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          notification.priority === 'urgent' ? 'bg-red-600' :
+                          notification.priority === 'high' ? 'bg-orange-600' :
+                          notification.priority === 'medium' ? 'bg-yellow-600' : 'bg-green-600'
+                        }`}>
+                          {notification.priority}
+                        </span>
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          notification.type === 'urgent' ? 'bg-red-600' :
+                          notification.type === 'deadline' ? 'bg-orange-600' :
+                          notification.type === 'class_timing' ? 'bg-blue-600' :
+                          notification.type === 'assignment_upload' ? 'bg-purple-600' : 'bg-gray-600'
+                        }`}>
+                          {notification.type.replace('_', ' ')}
+                        </span>
+                        {!notification.isRead && (
+                          <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                        )}
+                      </div>
+                      {!notification.isRead && (
+                        <button 
+                          onClick={() => handleMarkNotificationAsRead(notification._id)}
+                          className="px-2 py-1 rounded text-xs" 
+                          style={{ backgroundColor: '#388bff', color: '#fff' }}
+                        >
+                          Mark as Read
+                        </button>
+                      )}
+                    </div>
+                    
+                    <p className="mb-2">{notification.message}</p>
+                    
+                    <div className="text-sm" style={{ color: '#b0c4de' }}>
+                      <p>From: {notification.createdBy?.username || 'Admin'}</p>
+                      <p>Time: {new Date(notification.createdAt).toLocaleString()}</p>
+                      {notification.scheduledFor && (
+                        <p>Scheduled: {new Date(notification.scheduledFor).toLocaleString()}</p>
+                      )}
+                      {notification.expiresAt && (
+                        <p>Expires: {new Date(notification.expiresAt).toLocaleString()}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : active === "Certificates" ? (
           <div>
@@ -337,19 +613,15 @@ const StudentDashboard = () => {
             </ul>
           </div>
         ) : active === "Playground" ? (
-          <div>
-            {logLoading && <div>Loading...</div>}
-            {logError && <div className="text-red-500">{logError}</div>}
-            {logs.length === 0 && !logLoading ? <div>No playground logs yet.</div> : null}
-            <ul className="space-y-2 mt-4">
-              {logs.map((log) => (
-                <li key={log._id} className="p-2 rounded shadow flex flex-col mb-2" style={{ backgroundColor: '#23293b', color: '#fff' }}>
-                  <span className="font-semibold" style={{ color: '#388bff' }}>{log.language}</span>
-                  <span className="text-xs" style={{ color: '#b0c4de' }}>{new Date(log.createdAt).toLocaleString()}</span>
-                  <pre className="p-2 rounded mt-1 overflow-x-auto" style={{ backgroundColor: '#1a1e2a', color: '#fff' }}><code>{log.code}</code></pre>
-                </li>
-              ))}
-            </ul>
+          <div className="h-full">
+            {!user || !user._id ? (
+              <div className="text-red-500">User not found. Please log in again.</div>
+            ) : (
+              <CodePlayground 
+                userId={user._id}
+                onCodeSubmit={handleCodeSubmit}
+              />
+            )}
           </div>
         ) : (
           <div className="rounded-lg shadow p-6 min-h-[300px] flex items-center justify-center text-lg" style={{ backgroundColor: '#23293b', color: '#fff' }}>

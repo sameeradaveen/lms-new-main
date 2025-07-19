@@ -2,6 +2,9 @@ import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { fetchUsers, createUser, deleteUser } from "@/api/userApi"
 import { createCourse, fetchCourses } from "@/api/courseApi"
+import { fetchAllAttendance, exportAttendance } from "@/api/attendanceApi"
+import { fetchAllLiveLinks, createLiveLink, updateLiveLink, toggleLiveLinkStatus, deleteLiveLink } from "@/api/liveClassApi"
+import { fetchAllNotifications, createNotification, deleteNotification } from "@/api/notificationApi"
 
 const modules = [
   "Credential Management",
@@ -52,6 +55,51 @@ const AdminDashboard = () => {
   const [assignmentError, setAssignmentError] = useState('');
   const [assignmentList, setAssignmentList] = useState<any[]>([]);
 
+  // Live Link Management state
+  const [liveLinks, setLiveLinks] = useState<any[]>([])
+  const [liveLinkLoading, setLiveLinkLoading] = useState(false)
+  const [liveLinkError, setLiveLinkError] = useState("")
+  const [liveLinkMsg, setLiveLinkMsg] = useState("")
+  const [liveLinkForm, setLiveLinkForm] = useState({
+    title: '',
+    url: '',
+    platform: 'Google Meet',
+    description: '',
+    scheduledDate: '',
+    scheduledTime: '',
+    autoHide: false,
+    hideAfterHours: 24
+  })
+
+  // Attendance monitoring state
+  const [attendance, setAttendance] = useState<any[]>([])
+  const [attendanceLoading, setAttendanceLoading] = useState(false)
+  const [attendanceError, setAttendanceError] = useState("")
+  const [exportLoading, setExportLoading] = useState(false)
+  const [exportError, setExportError] = useState("")
+  const [exportMsg, setExportMsg] = useState("")
+  const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' })
+
+  // Notification management state
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [notificationLoading, setNotificationLoading] = useState(false)
+  const [notificationError, setNotificationError] = useState("")
+  const [notificationMsg, setNotificationMsg] = useState("")
+  const [notificationForm, setNotificationForm] = useState({
+    title: '',
+    message: '',
+    type: 'general',
+    priority: 'medium',
+    recipients: [] as string[],
+    scheduledFor: '',
+    expiresAt: '',
+    relatedData: {
+      courseId: '',
+      assignmentId: '',
+      liveClassId: ''
+    }
+  })
+
   // Fetch users
   useEffect(() => {
     if (active === "Credential Management") {
@@ -74,6 +122,42 @@ const AdminDashboard = () => {
     }
   }, [active])
 
+  // Fetch attendance records
+  useEffect(() => {
+    if (active === "Attendance/Submission Monitoring") {
+      setAttendanceLoading(true)
+      setAttendanceError("")
+      fetchAllAttendance()
+        .then(setAttendance)
+        .catch(err => setAttendanceError(err.message))
+        .finally(() => setAttendanceLoading(false))
+    }
+  }, [active])
+
+  // Fetch live links
+  useEffect(() => {
+    if (active === "Live Link Management") {
+      setLiveLinkLoading(true)
+      setLiveLinkError("")
+      fetchAllLiveLinks()
+        .then(setLiveLinks)
+        .catch(err => setLiveLinkError(err.message))
+        .finally(() => setLiveLinkLoading(false))
+    }
+  }, [active])
+
+  // Fetch notifications
+  useEffect(() => {
+    if (active === "Notifications") {
+      setNotificationLoading(true)
+      setNotificationError("")
+      fetchAllNotifications()
+        .then(setNotifications)
+        .catch(err => setNotificationError(err.message))
+        .finally(() => setNotificationLoading(false))
+    }
+  }, [active])
+
   useEffect(() => {
     if (active === 'Assignment Management') {
       fetch('/api/assignments')
@@ -82,6 +166,148 @@ const AdminDashboard = () => {
         .catch(() => setAssignmentList([]));
     }
   }, [active, assignmentMsg]);
+
+  const handleExportAttendance = async () => {
+    setExportLoading(true)
+    setExportError("")
+    setExportMsg("")
+    try {
+      await exportAttendance(dateRange.startDate, dateRange.endDate, 'csv')
+      setExportMsg("Attendance report exported successfully!")
+    } catch (err: any) {
+      setExportError(err.message)
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
+  const handleLiveLinkFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+    setLiveLinkForm(prev => ({ 
+      ...prev, 
+      [name]: type === 'checkbox' ? checked : value 
+    }));
+  };
+
+  const handleCreateLiveLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLiveLinkMsg('');
+    setLiveLinkError('');
+    try {
+      await createLiveLink(liveLinkForm);
+      setLiveLinkMsg('Live class link created successfully!');
+      setLiveLinkForm({
+        title: '',
+        url: '',
+        platform: 'Google Meet',
+        description: '',
+        scheduledDate: '',
+        scheduledTime: '',
+        autoHide: false,
+        hideAfterHours: 24
+      });
+      // Refresh live links list
+      const updated = await fetchAllLiveLinks();
+      setLiveLinks(updated);
+    } catch (err: any) {
+      setLiveLinkError(err.message);
+    }
+  };
+
+  const handleToggleLiveLinkStatus = async (id: string) => {
+    try {
+      await toggleLiveLinkStatus(id);
+      // Refresh live links list
+      const updated = await fetchAllLiveLinks();
+      setLiveLinks(updated);
+    } catch (err: any) {
+      setLiveLinkError(err.message);
+    }
+  };
+
+  const handleDeleteLiveLink = async (id: string) => {
+    if (!window.confirm('Delete this live class link?')) return;
+    try {
+      await deleteLiveLink(id);
+      setLiveLinks(links => links.filter(link => link._id !== id));
+    } catch (err: any) {
+      setLiveLinkError(err.message);
+    }
+  };
+
+  const handleNotificationFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+    
+    if (name.startsWith('relatedData.')) {
+      const field = name.split('.')[1];
+      setNotificationForm(prev => ({
+        ...prev,
+        relatedData: {
+          ...prev.relatedData,
+          [field]: value
+        }
+      }));
+    } else {
+      setNotificationForm(prev => ({ 
+        ...prev, 
+        [name]: type === 'checkbox' ? checked : value 
+      }));
+    }
+  };
+
+  const handleCreateNotification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setNotificationMsg('');
+    setNotificationError('');
+    
+    try {
+      const notificationData = {
+        ...notificationForm,
+        recipients: notificationForm.recipients.length > 0 ? notificationForm.recipients : users.map(u => u._id), // Send to all users if no specific recipients
+        scheduledFor: notificationForm.scheduledFor || undefined,
+        expiresAt: notificationForm.expiresAt || undefined,
+        relatedData: {
+          courseId: notificationForm.relatedData.courseId || undefined,
+          assignmentId: notificationForm.relatedData.assignmentId || undefined,
+          liveClassId: notificationForm.relatedData.liveClassId || undefined
+        }
+      };
+      
+      await createNotification(notificationData);
+      setNotificationMsg('Notification sent successfully!');
+      setNotificationForm({
+        title: '',
+        message: '',
+        type: 'general',
+        priority: 'medium',
+        recipients: [],
+        scheduledFor: '',
+        expiresAt: '',
+        relatedData: {
+          courseId: '',
+          assignmentId: '',
+          liveClassId: ''
+        }
+      });
+      // Refresh notifications list
+      const updated = await fetchAllNotifications();
+      setNotifications(updated);
+    } catch (err: any) {
+      setNotificationError(err.message);
+    }
+  };
+
+  const handleDeleteNotification = async (id: string) => {
+    if (!window.confirm('Delete this notification?')) return;
+    try {
+      await deleteNotification(id);
+      setNotifications(notifications => notifications.filter(n => n._id !== id));
+    } catch (err: any) {
+      setNotificationError(err.message);
+    }
+  };
 
   const handleAssignmentFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -146,9 +372,13 @@ const AdminDashboard = () => {
     e.preventDefault()
     setCreating(true)
     setCreateMsg("")
+    setUserError("")
+    
     try {
-      await createUser(newUser)
-      setCreateMsg("User created!")
+      console.log('Creating user:', newUser)
+      const result = await createUser(newUser)
+      console.log('User created successfully:', result)
+      setCreateMsg("User created successfully!")
       setNewUser({ username: '', password: '', role: 'student' })
       // Refresh user list
       setUserLoading(true)
@@ -156,7 +386,9 @@ const AdminDashboard = () => {
       setUsers(updated)
       setUserLoading(false)
     } catch (err: any) {
-      setCreateMsg(err.message)
+      console.error('Error creating user:', err)
+      setUserError(err.message || 'Failed to create user')
+      setCreateMsg("")
     } finally {
       setCreating(false)
     }
@@ -275,8 +507,8 @@ const AdminDashboard = () => {
               <button type="submit" disabled={creating} className="px-4 py-1 rounded bg-primary text-black font-semibold">Add</button>
             </form>
             {createMsg && <div className="mb-4 text-green-600">{createMsg}</div>}
+            {userError && <div className="mb-4 text-red-500">{userError}</div>}
             {userLoading && <div>Loading...</div>}
-            {userError && <div className="text-red-500">{userError}</div>}
             <div className="overflow-x-auto">
               <table className="min-w-full bg-gray-800 text-white rounded-lg shadow-md">
                 <thead>
@@ -454,8 +686,341 @@ const AdminDashboard = () => {
                 ))}
               </ul>
             </div>
-          )
-          : (
+          ) : active === "Live Link Management" ? (
+            <div className="mb-8">
+              <h4 className="text-lg font-bold mb-2" style={{ color: '#388bff' }}>Create New Live Link</h4>
+              <form onSubmit={handleCreateLiveLink} className="flex flex-col gap-3 p-4 rounded shadow" style={{ backgroundColor: '#23293b', color: '#fff' }}>
+                <input
+                  type="text"
+                  name="title"
+                  placeholder="Title (e.g., 'Daily Standup')"
+                  value={liveLinkForm.title}
+                  onChange={handleLiveLinkFormChange}
+                  className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                  style={{ color: '#fff', backgroundColor: '#23293b' }}
+                  required
+                />
+                <input
+                  type="url"
+                  name="url"
+                  placeholder="Live Meeting URL (e.g., https://meet.google.com/abc-123-def)"
+                  value={liveLinkForm.url}
+                  onChange={handleLiveLinkFormChange}
+                  className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                  style={{ color: '#fff', backgroundColor: '#23293b' }}
+                  required
+                />
+                <select
+                  name="platform"
+                  value={liveLinkForm.platform}
+                  onChange={handleLiveLinkFormChange}
+                  className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                  style={{ color: '#fff', backgroundColor: '#23293b' }}
+                >
+                  <option value="Google Meet">Google Meet</option>
+                  <option value="Zoom">Zoom</option>
+                  <option value="Microsoft Teams">Microsoft Teams</option>
+                  <option value="Others">Others</option>
+                </select>
+                <textarea
+                  name="description"
+                  placeholder="Description (optional)"
+                  value={liveLinkForm.description}
+                  onChange={handleLiveLinkFormChange}
+                  className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                  style={{ color: '#fff', backgroundColor: '#23293b' }}
+                />
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="date"
+                    name="scheduledDate"
+                    value={liveLinkForm.scheduledDate}
+                    onChange={handleLiveLinkFormChange}
+                    className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                    style={{ color: '#fff', backgroundColor: '#23293b' }}
+                  />
+                  <input
+                    type="time"
+                    name="scheduledTime"
+                    value={liveLinkForm.scheduledTime}
+                    onChange={handleLiveLinkFormChange}
+                    className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                    style={{ color: '#fff', backgroundColor: '#23293b' }}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    name="autoHide"
+                    checked={liveLinkForm.autoHide}
+                    onChange={handleLiveLinkFormChange}
+                    className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                    style={{ color: '#fff', backgroundColor: '#23293b' }}
+                  />
+                  <label className="text-sm">Auto-hide after scheduled time</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    name="hideAfterHours"
+                    value={liveLinkForm.hideAfterHours}
+                    onChange={handleLiveLinkFormChange}
+                    className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                    style={{ color: '#fff', backgroundColor: '#23293b' }}
+                  />
+                  <label className="text-sm">Hide after (hours)</label>
+                </div>
+                {liveLinkError && <div className="text-red-500">{liveLinkError}</div>}
+                {liveLinkMsg && <div className="text-green-500">{liveLinkMsg}</div>}
+                <button type="submit" disabled={liveLinkLoading} className="mt-2 px-6 py-2 rounded font-semibold shadow" style={{ backgroundColor: '#388bff', color: '#fff' }}>
+                  {liveLinkLoading ? 'Creating...' : 'Create Live Link'}
+                </button>
+              </form>
+
+              <h4 className="text-lg font-bold mb-2 mt-8" style={{ color: '#388bff' }}>Live Link List</h4>
+              {liveLinkLoading && <div>Loading live links...</div>}
+              {liveLinkError && <div className="text-red-500">{liveLinkError}</div>}
+              {!liveLinkLoading && !liveLinkError && (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full bg-gray-800 text-white rounded-lg shadow-md">
+                    <thead>
+                      <tr style={{ backgroundColor: '#1a1e2a', color: '#388bff' }}>
+                        <th className="py-2 px-4">Title</th>
+                        <th className="py-2 px-4">URL</th>
+                        <th className="py-2 px-4">Platform</th>
+                        <th className="py-2 px-4">Scheduled</th>
+                        <th className="py-2 px-4">Status</th>
+                        <th className="py-2 px-4">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {liveLinks.map(link => (
+                        <tr key={link._id} style={{ backgroundColor: '#23293b', color: '#fff' }}>
+                          <td className="py-2 px-4">{link.title}</td>
+                          <td className="py-2 px-4">
+                            <a href={link.url} target="_blank" rel="noopener noreferrer" style={{ color: '#388bff' }}>{link.url}</a>
+                          </td>
+                          <td className="py-2 px-4">{link.platform}</td>
+                          <td className="py-2 px-4">
+                            {link.scheduledDate 
+                              ? `${new Date(link.scheduledDate).toLocaleDateString()} ${link.scheduledTime || ''}`
+                              : 'Not scheduled'
+                            }
+                          </td>
+                          <td className="py-2 px-4">
+                            <span className={`px-2 py-1 rounded text-xs ${link.active ? 'bg-green-600' : 'bg-red-600'}`}>
+                              {link.active ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="py-2 px-4">
+                            <button onClick={() => handleToggleLiveLinkStatus(link._id)} className="px-2 py-1 rounded" style={{ backgroundColor: '#388bff', color: '#fff' }}>
+                              {link.active ? 'Deactivate' : 'Activate'}
+                            </button>
+                            <button onClick={() => handleDeleteLiveLink(link._id)} className="ml-2 px-2 py-1 rounded" style={{ backgroundColor: '#388bff', color: '#fff' }}>
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : active === "Notifications" ? (
+            <div className="mb-8">
+              <h4 className="text-lg font-bold mb-2" style={{ color: '#388bff' }}>Send Notification</h4>
+              <form onSubmit={handleCreateNotification} className="flex flex-col gap-3 p-4 rounded shadow" style={{ backgroundColor: '#23293b', color: '#fff' }}>
+                <input
+                  type="text"
+                  name="title"
+                  placeholder="Notification Title"
+                  value={notificationForm.title}
+                  onChange={handleNotificationFormChange}
+                  className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                  style={{ color: '#fff', backgroundColor: '#23293b' }}
+                  required
+                />
+                <textarea
+                  name="message"
+                  placeholder="Notification Message"
+                  value={notificationForm.message}
+                  onChange={handleNotificationFormChange}
+                  className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                  style={{ color: '#fff', backgroundColor: '#23293b' }}
+                  required
+                />
+                <div className="flex gap-2">
+                  <select
+                    name="type"
+                    value={notificationForm.type}
+                    onChange={handleNotificationFormChange}
+                    className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                    style={{ color: '#fff', backgroundColor: '#23293b' }}
+                  >
+                    <option value="general">General</option>
+                    <option value="class_timing">Class Timing</option>
+                    <option value="deadline">Deadline</option>
+                    <option value="assignment_upload">Assignment Upload</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                  <select
+                    name="priority"
+                    value={notificationForm.priority}
+                    onChange={handleNotificationFormChange}
+                    className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                    style={{ color: '#fff', backgroundColor: '#23293b' }}
+                  >
+                    <option value="low">Low Priority</option>
+                    <option value="medium">Medium Priority</option>
+                    <option value="high">High Priority</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="datetime-local"
+                    name="scheduledFor"
+                    value={notificationForm.scheduledFor}
+                    onChange={handleNotificationFormChange}
+                    className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                    style={{ color: '#fff', backgroundColor: '#23293b' }}
+                    placeholder="Schedule for (optional)"
+                  />
+                  <input
+                    type="datetime-local"
+                    name="expiresAt"
+                    value={notificationForm.expiresAt}
+                    onChange={handleNotificationFormChange}
+                    className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                    style={{ color: '#fff', backgroundColor: '#23293b' }}
+                    placeholder="Expires at (optional)"
+                  />
+                </div>
+                {notificationError && <div className="text-red-500">{notificationError}</div>}
+                {notificationMsg && <div className="text-green-500">{notificationMsg}</div>}
+                <button type="submit" disabled={notificationLoading} className="mt-2 px-6 py-2 rounded font-semibold shadow" style={{ backgroundColor: '#388bff', color: '#fff' }}>
+                  {notificationLoading ? 'Sending...' : 'Send Notification'}
+                </button>
+              </form>
+
+              <h4 className="text-lg font-bold mb-2 mt-8" style={{ color: '#388bff' }}>Notification History</h4>
+              {notificationLoading && <div>Loading notifications...</div>}
+              {notificationError && <div className="text-red-500">{notificationError}</div>}
+              {!notificationLoading && !notificationError && (
+                <div className="space-y-4">
+                  {notifications.map(notification => (
+                    <div key={notification._id} className="p-4 rounded shadow" style={{ backgroundColor: '#23293b', color: '#fff' }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold" style={{ color: '#388bff' }}>{notification.title}</span>
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            notification.priority === 'urgent' ? 'bg-red-600' :
+                            notification.priority === 'high' ? 'bg-orange-600' :
+                            notification.priority === 'medium' ? 'bg-yellow-600' : 'bg-green-600'
+                          }`}>
+                            {notification.priority}
+                          </span>
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            notification.type === 'urgent' ? 'bg-red-600' :
+                            notification.type === 'deadline' ? 'bg-orange-600' :
+                            notification.type === 'class_timing' ? 'bg-blue-600' :
+                            notification.type === 'assignment_upload' ? 'bg-purple-600' : 'bg-gray-600'
+                          }`}>
+                            {notification.type.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <button onClick={() => handleDeleteNotification(notification._id)} className="px-2 py-1 rounded" style={{ backgroundColor: '#388bff', color: '#fff' }}>
+                          Delete
+                        </button>
+                      </div>
+                      <p className="mb-2">{notification.message}</p>
+                      <div className="text-sm" style={{ color: '#b0c4de' }}>
+                        <p>Created by: {notification.createdBy?.username || 'Admin'}</p>
+                        <p>Created: {new Date(notification.createdAt).toLocaleString()}</p>
+                        {notification.scheduledFor && <p>Scheduled for: {new Date(notification.scheduledFor).toLocaleString()}</p>}
+                        {notification.expiresAt && <p>Expires: {new Date(notification.expiresAt).toLocaleString()}</p>}
+                        <p>Recipients: {notification.recipients?.length || 0} users</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : active === "Attendance/Submission Monitoring" ? (
+            <div>
+              <div className="mb-6 p-4 rounded shadow" style={{ backgroundColor: '#23293b', color: '#fff' }}>
+                <h4 className="text-lg font-bold mb-4" style={{ color: '#388bff' }}>Export Attendance Report</h4>
+                <div className="flex gap-4 items-end">
+                  <div>
+                    <label className="block text-sm mb-1">Start Date</label>
+                    <input
+                      type="date"
+                      value={dateRange.startDate}
+                      onChange={e => setDateRange({ ...dateRange, startDate: e.target.value })}
+                      className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                      style={{ color: '#fff', backgroundColor: '#23293b' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm mb-1">End Date</label>
+                    <input
+                      type="date"
+                      value={dateRange.endDate}
+                      onChange={e => setDateRange({ ...dateRange, endDate: e.target.value })}
+                      className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                      style={{ color: '#fff', backgroundColor: '#23293b' }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleExportAttendance}
+                    disabled={exportLoading}
+                    className="px-6 py-2 rounded font-semibold shadow" 
+                    style={{ backgroundColor: '#388bff', color: '#fff' }}
+                  >
+                    {exportLoading ? 'Exporting...' : 'Export CSV'}
+                  </button>
+                </div>
+                {exportMsg && <div className="mt-2 text-green-500">{exportMsg}</div>}
+                {exportError && <div className="mt-2 text-red-500">{exportError}</div>}
+              </div>
+
+              <h4 className="text-lg font-bold mb-4" style={{ color: '#388bff' }}>Attendance Records</h4>
+              {attendanceLoading && <div>Loading attendance records...</div>}
+              {attendanceError && <div className="text-red-500">{attendanceError}</div>}
+              {!attendanceLoading && !attendanceError && (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full bg-gray-800 text-white rounded-lg shadow-md">
+                    <thead>
+                      <tr style={{ backgroundColor: '#1a1e2a', color: '#388bff' }}>
+                        <th className="py-2 px-4">Date</th>
+                        <th className="py-2 px-4">Username</th>
+                        <th className="py-2 px-4">Time</th>
+                        <th className="py-2 px-4">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {attendance.map(record => {
+                        const user = record.user as any;
+                        return (
+                          <tr key={record._id} style={{ backgroundColor: '#23293b', color: '#fff' }}>
+                            <td className="py-2 px-4">{new Date(record.date).toLocaleDateString()}</td>
+                            <td className="py-2 px-4">{user?.username || 'Unknown'}</td>
+                            <td className="py-2 px-4">{record.time || 'N/A'}</td>
+                            <td className="py-2 px-4">
+                              <span className={`px-2 py-1 rounded text-xs ${record.checkedIn ? 'bg-green-600' : 'bg-red-600'}`}>
+                                {record.checkedIn ? 'Present' : 'Absent'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : (
             <div className="rounded-lg shadow p-6 min-h-[300px] flex items-center justify-center text-lg" style={{ backgroundColor: '#23293b', color: '#fff' }}>
               {[
                 "Credential Management",

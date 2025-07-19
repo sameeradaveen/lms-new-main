@@ -1,33 +1,28 @@
 import { ReactNode } from "react"
-import { AppContextProvider } from "./AppContext.js"
-import { ChatContextProvider } from "./ChatContext.jsx"
-import { FileContextProvider } from "./FileContext.jsx"
-import { RunCodeContextProvider } from "./RunCodeContext.jsx"
-import { SettingContextProvider } from "./SettingContext.jsx"
-import { SocketProvider } from "./SocketContext.jsx"
-import { ViewContextProvider } from "./ViewContext.js"
-import { CopilotContextProvider } from "./CopilotContext.js"
+import { AppContextProvider } from "./AppContext"
+import { FileContextProvider } from "./FileContext"
+import { RunCodeContextProvider } from "./RunCodeContext"
+import { SettingsProvider } from "./SettingContext"
+import { SocketProvider } from "./SocketContext"
 
-function AppProvider({ children }: { children: ReactNode }) {
-    return (
-        <AppContextProvider>
-            <SocketProvider>
-                <SettingContextProvider>
-                    <ViewContextProvider>
-                        <FileContextProvider>
-                            <CopilotContextProvider>
-                                <RunCodeContextProvider>
-                                    <ChatContextProvider>
-                                        {children}
-                                    </ChatContextProvider>
-                                </RunCodeContextProvider>
-                            </CopilotContextProvider>
-                        </FileContextProvider>
-                    </ViewContextProvider>
-                </SettingContextProvider>
-            </SocketProvider>
-        </AppContextProvider>
-    )
+interface AppProviderProps {
+	children: ReactNode
+}
+
+const AppProvider = ({ children }: AppProviderProps) => {
+	return (
+		<AppContextProvider>
+			<SocketProvider>
+				<FileContextProvider>
+					<RunCodeContextProvider>
+						<SettingsProvider>
+							{children}
+						</SettingsProvider>
+					</RunCodeContextProvider>
+				</FileContextProvider>
+			</SocketProvider>
+		</AppContextProvider>
+	)
 }
 
 export default AppProvider

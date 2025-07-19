@@ -1,5 +1,4 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom"
-import GitHubCorner from "./components/GitHubCorner"
 import Toast from "./components/toast/Toast"
 import EditorPage from "./pages/EditorPage"
 import HomePage from "./pages/HomePage"
@@ -20,7 +19,6 @@ const App = () => {
                 </Routes>
             </Router>
             <Toast />
-            <GitHubCorner />
         </>
     )
 }

@@ -1,110 +1,83 @@
-import useLocalStorage from "@/hooks/useLocalStorage"
-import {
-    Settings,
-    SettingsContext as SettingsContextType,
-} from "@/types/setting"
-import {
-    ReactNode,
-    createContext,
-    useContext,
-    useEffect,
-    useState,
-} from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 
-const SettingContext = createContext<SettingsContextType | null>(null)
-
-export const useSettings = (): SettingsContextType => {
-    const context = useContext(SettingContext)
-    if (!context) {
-        throw new Error(
-            "useSettings must be used within a SettingContextProvider",
-        )
-    }
-    return context
+interface SettingsContextType {
+	theme: string
+	setTheme: (theme: string) => void
+	language: string
+	setLanguage: (language: string) => void
+	fontSize: number
+	setFontSize: (fontSize: number) => void
+	fontFamily: string
+	setFontFamily: (fontFamily: string) => void
 }
 
-const defaultSettings: Settings = {
-    theme: "Dracula",
-    language: "Javascript",
-    fontSize: 16,
-    fontFamily: "Space Mono",
-    showGitHubCorner: true,
+const defaultSettings = {
+	theme: "dracula",
+	language: "javascript",
+	fontSize: 14,
+	fontFamily: "Fira Code",
 }
 
-function SettingContextProvider({ children }: { children: ReactNode }) {
-    const { getItem } = useLocalStorage()
-    const storedSettings: Partial<Settings> = JSON.parse(
-        getItem("settings") || "{}",
-    )
-    const storedTheme =
-        storedSettings.theme !== undefined
-            ? storedSettings.theme
-            : defaultSettings.theme
-    const storedLanguage =
-        storedSettings.language !== undefined
-            ? storedSettings.language
-            : defaultSettings.language
-    const storedFontSize =
-        storedSettings.fontSize !== undefined
-            ? storedSettings.fontSize
-            : defaultSettings.fontSize
-    const storedFontFamily =
-        storedSettings.fontFamily !== undefined
-            ? storedSettings.fontFamily
-            : defaultSettings.fontFamily
-    const storedShowGitHubCorner =
-        storedSettings.showGitHubCorner !== undefined
-            ? storedSettings.showGitHubCorner
-            : defaultSettings.showGitHubCorner
+const SettingsContext = createContext<SettingsContextType | undefined>(undefined)
 
-    const [theme, setTheme] = useState<string>(storedTheme)
-    const [language, setLanguage] = useState<string>(storedLanguage)
-    const [fontSize, setFontSize] = useState<number>(storedFontSize)
-    const [fontFamily, setFontFamily] = useState<string>(storedFontFamily)
-    const [showGitHubCorner, setShowGitHubCorner] = useState<boolean>(
-        storedShowGitHubCorner,
-    )
-
-    const resetSettings = () => {
-        setTheme(defaultSettings.theme)
-        setLanguage(defaultSettings.language)
-        setFontSize(defaultSettings.fontSize)
-        setFontFamily(defaultSettings.fontFamily)
-        setShowGitHubCorner(defaultSettings.showGitHubCorner)
-    }
-
-    useEffect(() => {
-        // Save settings to local storage whenever they change
-        const updatedSettings = {
-            theme,
-            language,
-            fontSize,
-            fontFamily,
-            showGitHubCorner,
-        }
-        localStorage.setItem("settings", JSON.stringify(updatedSettings))
-    }, [theme, language, fontSize, fontFamily, showGitHubCorner])
-
-    return (
-        <SettingContext.Provider
-            value={{
-                theme,
-                setTheme,
-                language,
-                setLanguage,
-                fontSize,
-                setFontSize,
-                fontFamily,
-                setFontFamily,
-                showGitHubCorner,
-                setShowGitHubCorner,
-                resetSettings,
-            }}
-        >
-            {children}
-        </SettingContext.Provider>
-    )
+export const useSettings = () => {
+	const context = useContext(SettingsContext)
+	if (!context) {
+		throw new Error("useSettings must be used within a SettingsProvider")
+	}
+	return context
 }
 
-export { SettingContextProvider }
-export default SettingContext
+export const SettingsProvider = ({ children }: { children: React.ReactNode }) => {
+	const storedSettings = JSON.parse(
+		localStorage.getItem("settings") || "{}"
+	)
+
+	const [theme, setTheme] = useState<string>(
+		storedSettings.theme !== undefined
+			? storedSettings.theme
+			: defaultSettings.theme
+	)
+	const [language, setLanguage] = useState<string>(
+		storedSettings.language !== undefined
+			? storedSettings.language
+			: defaultSettings.language
+	)
+	const [fontSize, setFontSize] = useState<number>(
+		storedSettings.fontSize !== undefined
+			? storedSettings.fontSize
+			: defaultSettings.fontSize
+	)
+	const [fontFamily, setFontFamily] = useState<string>(
+		storedSettings.fontFamily !== undefined
+			? storedSettings.fontFamily
+			: defaultSettings.fontFamily
+	)
+
+	useEffect(() => {
+		const settings = {
+			theme,
+			language,
+			fontSize,
+			fontFamily,
+		}
+		localStorage.setItem("settings", JSON.stringify(settings))
+	}, [theme, language, fontSize, fontFamily])
+
+	const value: SettingsContextType = {
+		theme,
+		setTheme,
+		language,
+		setLanguage,
+		fontSize,
+		setFontSize,
+		fontFamily,
+		setFontFamily,
+	}
+
+	return (
+		<SettingsContext.Provider value={value}>
+			{children}
+		</SettingsContext.Provider>
+	)
+}
