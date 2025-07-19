@@ -27,30 +27,30 @@ export const checkin = async (req: Request, res: Response) => {
     // Create new attendance record
     const record = new Attendance({ user, date, checkedIn: true, time });
     await record.save();
-    res.status(201).json({ 
+    return res.status(201).json({ 
       message: 'Attendance checked in successfully!',
       record 
     });
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
 export const getAll = async (req: Request, res: Response) => {
   try {
     const records = await Attendance.find().populate('user', 'username');
-    res.json(records);
+    return res.json(records);
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    return res.status(500).json({ error: (err as Error).message });
   }
 };
 
 export const getByUser = async (req: Request, res: Response) => {
   try {
     const records = await Attendance.find({ user: req.params.userId });
-    res.json(records);
+    return res.json(records);
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
@@ -85,16 +85,16 @@ export const exportAttendance = async (req: Request, res: Response) => {
       
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=attendance_report_${new Date().toISOString().split('T')[0]}.csv`);
-      res.send(csvData);
+      return res.send(csvData);
     } else {
       // Return JSON format
-      res.json({
+      return res.json({
         totalRecords: records.length,
         records: records,
         exportDate: new Date().toISOString()
       });
     }
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    return res.status(500).json({ error: (err as Error).message });
   }
 }; 

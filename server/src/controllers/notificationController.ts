@@ -5,9 +5,9 @@ export const create = async (req: Request, res: Response) => {
   try {
     const notification = new Notification(req.body);
     await notification.save();
-    res.status(201).json(notification);
+    return res.status(201).json(notification);
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
@@ -17,9 +17,9 @@ export const getAll = async (req: Request, res: Response) => {
       .populate('createdBy', 'username')
       .populate('recipients', 'username')
       .sort({ createdAt: -1 });
-    res.json(notifications);
+    return res.json(notifications);
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    return res.status(500).json({ error: (err as Error).message });
   }
 };
 
@@ -34,9 +34,9 @@ export const getByUser = async (req: Request, res: Response) => {
     })
       .populate('createdBy', 'username')
       .sort({ createdAt: -1 });
-    res.json(notifications);
+    return res.json(notifications);
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
@@ -52,9 +52,9 @@ export const getUnreadByUser = async (req: Request, res: Response) => {
     })
       .populate('createdBy', 'username')
       .sort({ createdAt: -1 });
-    res.json(notifications);
+    return res.json(notifications);
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
@@ -69,9 +69,9 @@ export const markAsRead = async (req: Request, res: Response) => {
     if (!notification) {
       return res.status(404).json({ error: 'Notification not found' });
     }
-    res.json(notification);
+    return res.json(notification);
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
@@ -82,17 +82,17 @@ export const markAllAsRead = async (req: Request, res: Response) => {
       { recipients: userId, isRead: false },
       { isRead: true }
     );
-    res.json({ message: 'All notifications marked as read' });
+    return res.json({ message: 'All notifications marked as read' });
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
 export const remove = async (req: Request, res: Response) => {
   try {
     await Notification.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Notification deleted successfully' });
+    return res.json({ message: 'Notification deleted successfully' });
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 }; 

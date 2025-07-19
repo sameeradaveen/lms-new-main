@@ -24,18 +24,18 @@ export const createAssignment = async (req: Request, res: Response) => {
       testCases: type === 'coding' && testCases ? JSON.parse(testCases) : [],
     });
     await assignment.save();
-    res.status(201).json(assignment);
+    return res.status(201).json(assignment);
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
 export const getAllAssignments = async (req: Request, res: Response) => {
   try {
     const assignments = await Assignment.find();
-    res.json(assignments);
+    return res.json(assignments);
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    return res.status(500).json({ error: (err as Error).message });
   }
 };
 
@@ -43,9 +43,9 @@ export const getAssignmentById = async (req: Request, res: Response) => {
   try {
     const assignment = await Assignment.findById(req.params.id);
     if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
-    res.json(assignment);
+    return res.json(assignment);
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    return res.status(500).json({ error: (err as Error).message });
   }
 };
 
@@ -67,8 +67,8 @@ export const deleteAssignment = async (req: Request, res: Response) => {
       }
       await sub.deleteOne();
     }
-    res.json({ message: 'Assignment and related submissions deleted' });
+    return res.json({ message: 'Assignment and related submissions deleted' });
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    return res.status(500).json({ error: (err as Error).message });
   }
 }; 

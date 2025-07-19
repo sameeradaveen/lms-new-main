@@ -15,18 +15,18 @@ export const create = async (req: Request, res: Response) => {
     const pdfUrl = fileReq.file ? `/uploads/${fileReq.file.filename}` : undefined;
     const course = new CourseModule({ title, description, track, pdfUrl });
     await course.save();
-    res.status(201).json(course);
+    return res.status(201).json(course);
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
 export const getAll = async (req: Request, res: Response) => {
   try {
     const modules = await CourseModule.find();
-    res.json(modules);
+    return res.json(modules);
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    return res.status(500).json({ error: (err as Error).message });
   }
 };
 
@@ -34,27 +34,27 @@ export const getById = async (req: Request, res: Response) => {
   try {
     const module = await CourseModule.findById(req.params.id);
     if (!module) return res.status(404).json({ error: 'Not found' });
-    res.json(module);
+    return res.json(module);
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
 export const update = async (req: Request, res: Response) => {
   try {
     const module = await CourseModule.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    res.json(module);
+    return res.json(module);
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
 export const remove = async (req: Request, res: Response) => {
   try {
     await CourseModule.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Deleted' });
+    return res.json({ message: 'Deleted' });
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
@@ -69,10 +69,10 @@ export const deletePdf = async (req: Request, res: Response) => {
     fs.unlink(filePath, (err) => {
       if (err) console.error('Failed to delete PDF:', err);
     });
-    course.pdfUrl = undefined;
+    course.pdfUrl = null;
     await course.save();
-    res.json({ message: 'PDF deleted' });
+    return res.json({ message: 'PDF deleted' });
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 }; 

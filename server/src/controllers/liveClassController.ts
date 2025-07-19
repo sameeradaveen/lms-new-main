@@ -5,18 +5,18 @@ export const create = async (req: Request, res: Response) => {
   try {
     const link = new LiveClassLink(req.body);
     await link.save();
-    res.status(201).json(link);
+    return res.status(201).json(link);
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
 export const getAll = async (req: Request, res: Response) => {
   try {
     const links = await LiveClassLink.find().populate('createdBy', 'username');
-    res.json(links);
+    return res.json(links);
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    return res.status(500).json({ error: (err as Error).message });
   }
 };
 
@@ -35,9 +35,9 @@ export const getActive = async (req: Request, res: Response) => {
         }
       ]
     }).populate('createdBy', 'username');
-    res.json(links);
+    return res.json(links);
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    return res.status(500).json({ error: (err as Error).message });
   }
 };
 
@@ -46,9 +46,9 @@ export const update = async (req: Request, res: Response) => {
     const { id } = req.params;
     const link = await LiveClassLink.findByIdAndUpdate(id, req.body, { new: true });
     if (!link) return res.status(404).json({ error: 'Live class link not found' });
-    res.json(link);
+    return res.json(link);
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
@@ -60,17 +60,17 @@ export const toggleActive = async (req: Request, res: Response) => {
     
     link.active = !link.active;
     await link.save();
-    res.json(link);
+    return res.json(link);
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
 export const remove = async (req: Request, res: Response) => {
   try {
     await LiveClassLink.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Live class link deleted successfully' });
+    return res.json({ message: 'Live class link deleted successfully' });
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 }; 

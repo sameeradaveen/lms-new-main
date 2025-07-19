@@ -49,10 +49,10 @@ export const executeCode = async (req: Request, res: Response) => {
     // Clean up temporary files
     cleanupTempFiles(fileId, tempDir);
 
-    res.json({ output: result });
+    return res.json({ output: result });
   } catch (error) {
     console.error('Code execution error:', error);
-    res.status(500).json({ error: 'Code execution failed' });
+    return res.status(500).json({ error: 'Code execution failed' });
   }
 };
 

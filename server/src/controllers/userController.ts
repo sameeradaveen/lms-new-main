@@ -25,10 +25,10 @@ export const register = async (req: Request, res: Response) => {
     await user.save();
     
     console.log('User created successfully:', { username, role });
-    res.status(201).json({ message: 'User created successfully', user: { username, role } });
+    return res.status(201).json({ message: 'User created successfully', user: { username, role } });
   } catch (err) {
     console.error('Error in register:', err);
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
@@ -40,9 +40,9 @@ export const login = async (req: Request, res: Response) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
-    res.json({ token, user: { _id: user._id, username: user.username, role: user.role } });
+    return res.json({ token, user: { _id: user._id, username: user.username, role: user.role } });
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
@@ -51,10 +51,10 @@ export const getAll = async (req: Request, res: Response) => {
     console.log('Get all users request received');
     const users = await User.find().select('-password');
     console.log('Found users:', users.length);
-    res.json(users);
+    return res.json(users);
   } catch (err) {
     console.error('Error in getAll:', err);
-    res.status(500).json({ error: (err as Error).message });
+    return res.status(500).json({ error: (err as Error).message });
   }
 };
 
@@ -66,9 +66,9 @@ export const update = async (req: Request, res: Response) => {
       updateData.password = await bcrypt.hash(updateData.password, 10);
     }
     const user = await User.findByIdAndUpdate(id, updateData, { new: true }).select('-password');
-    res.json(user);
+    return res.json(user);
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 };
 
@@ -76,8 +76,8 @@ export const remove = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     await User.findByIdAndDelete(id);
-    res.json({ message: 'User deleted' });
+    return res.json({ message: 'User deleted' });
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    return res.status(400).json({ error: (err as Error).message });
   }
 }; 
