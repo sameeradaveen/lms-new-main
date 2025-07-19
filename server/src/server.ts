@@ -30,38 +30,28 @@ app.use(express.static(path.join(__dirname, "public"))) // Serve static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Connect to MongoDB with fallback options
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/nextgenfreeedu"
-
-console.log("🔗 Attempting to connect to MongoDB...")
-console.log("📍 Connection string:", MONGODB_URI)
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+    console.error("❌ ERROR: MONGODB_URI not set in .env file");
+    process.exit(1);
+}
+console.log("🔗 Connecting to MongoDB Atlas...");
+console.log("📍 Connection string:", MONGODB_URI);
 
 mongoose.connect(MONGODB_URI, {
-  serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
-  socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
-  bufferCommands: false, // Disable mongoose buffering
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+  bufferCommands: false,
 })
 .then(() => {
-  console.log("✅ MongoDB connected successfully")
-  console.log("📊 Database:", mongoose.connection.name)
-  console.log("🌐 Host:", mongoose.connection.host)
+  console.log("✅ MongoDB Atlas connected successfully");
+  console.log("📊 Database:", mongoose.connection.name);
+  console.log("🌐 Host:", mongoose.connection.host);
 })
 .catch((err) => {
-  console.error("❌ MongoDB connection error:", err.message)
-  console.log("")
-  console.log("🔧 SOLUTIONS:")
-  console.log("1. Install MongoDB locally:")
-  console.log("   - Download from: https://www.mongodb.com/try/download/community")
-  console.log("   - Or use MongoDB Atlas (cloud): https://www.mongodb.com/atlas")
-  console.log("")
-  console.log("2. Create a .env file in server folder with:")
-  console.log("   MONGODB_URI=mongodb://localhost:27017/nextgenfreeedu")
-  console.log("")
-  console.log("3. Start MongoDB service:")
-  console.log("   - Windows: Start MongoDB service from Services")
-  console.log("   - Or run: mongod --dbpath C:\\data\\db")
-  console.log("")
-  process.exit(1) // Exit if database connection fails
-})
+  console.error("❌ MongoDB Atlas connection error:", err.message);
+  process.exit(1);
+});
 
 const server = http.createServer(app)
 const io = new Server(server, {
