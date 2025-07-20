@@ -7,6 +7,7 @@ import { USER_CONNECTION_STATUS, User } from "./types/user"
 import { Server } from "socket.io"
 import path from "path"
 import mongoose from "mongoose"
+import fs from "fs"
 import userRoutes from './routes/userRoutes'
 import courseModuleRoutes from './routes/courseModuleRoutes'
 import attendanceRoutes from './routes/attendanceRoutes'
@@ -27,7 +28,64 @@ app.use(express.json())
 app.use(cors())
 
 app.use(express.static(path.join(__dirname, "public"))) // Serve static files
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Enhanced file serving for multi-admin environments
+const uploadsPath = path.join(__dirname, '../uploads');
+console.log('📁 Uploads directory path:', uploadsPath);
+
+// Check if uploads directory exists and create if needed
+if (!fs.existsSync(uploadsPath)) {
+  console.warn('⚠️ Uploads directory does not exist, creating it...');
+  fs.mkdirSync(uploadsPath, { recursive: true });
+}
+
+// Serve uploads with enhanced error handling and logging
+app.use('/uploads', express.static(uploadsPath, {
+  setHeaders: (res, path) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+  },
+  fallthrough: false,
+  index: false
+}));
+
+// Add comprehensive logging for file access
+app.use('/uploads', (req, res, next) => {
+  const filePath = path.join(uploadsPath, req.path);
+  console.log('📄 File access request:', {
+    path: req.path,
+    fullPath: filePath,
+    method: req.method,
+    userAgent: req.get('User-Agent'),
+    timestamp: new Date().toISOString()
+  });
+  
+  if (!fs.existsSync(filePath)) {
+    console.warn('❌ File not found:', {
+      requestedPath: req.path,
+      fullPath: filePath,
+      availableFiles: fs.readdirSync(uploadsPath)
+    });
+    return res.status(404).json({ 
+      error: 'File not found', 
+      path: req.path,
+      fullPath: filePath,
+      availableFiles: fs.readdirSync(uploadsPath)
+    });
+  }
+  
+  // Check file permissions
+  try {
+    fs.accessSync(filePath, fs.constants.R_OK);
+  } catch (err) {
+    console.error('❌ File permission error:', err);
+    return res.status(403).json({ error: 'File access denied' });
+  }
+  
+  console.log('✅ File access granted:', req.path);
+  next();
+});
 
 // Connect to MongoDB with fallback options
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -306,6 +364,70 @@ app.use('/api/notifications', notificationRoutes)
 app.use('/api/certificates', certificateRoutes)
 app.use('/api/playgroundlogs', playgroundLogRoutes)
 app.use('/api/codeexecution', codeExecutionRoutes)
+
+// File debugging endpoint for multi-admin troubleshooting
+app.get('/api/files/debug', (req: Request, res: Response) => {
+  try {
+    const files = fs.readdirSync(uploadsPath);
+    const fileStats = files.map(filename => {
+      const filePath = path.join(uploadsPath, filename);
+      const stats = fs.statSync(filePath);
+      return {
+        filename,
+        size: stats.size,
+        created: stats.birthtime,
+        modified: stats.mtime,
+        permissions: stats.mode.toString(8)
+      };
+    });
+    
+    res.json({
+      uploadsDirectory: uploadsPath,
+      totalFiles: files.length,
+      files: fileStats
+    });
+  } catch (err) {
+    console.error('❌ File debug error:', err);
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// File verification endpoint
+app.get('/api/files/verify/:filename', (req: Request, res: Response) => {
+  try {
+    const { filename } = req.params;
+    
+    if (!filename) {
+      return res.status(400).json({ error: 'Filename is required' });
+    }
+    
+    const filePath = path.join(uploadsPath, filename);
+    const exists = fs.existsSync(filePath);
+    
+    if (exists) {
+      const stats = fs.statSync(filePath);
+      res.json({
+        exists: true,
+        filename,
+        size: stats.size,
+        created: stats.birthtime,
+        modified: stats.mtime,
+        permissions: stats.mode.toString(8),
+        path: filePath
+      });
+    } else {
+      res.json({
+        exists: false,
+        filename,
+        path: filePath,
+        availableFiles: fs.readdirSync(uploadsPath)
+      });
+    }
+  } catch (err) {
+    console.error('❌ File verification error:', err);
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
 
 const PORT = process.env.PORT || 3000
 

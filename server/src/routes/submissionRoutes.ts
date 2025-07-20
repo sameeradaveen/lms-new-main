@@ -1,5 +1,5 @@
 import express from 'express';
-import { createSubmission, getSubmissionsByAssignment, getSubmissionsByStudent } from '../controllers/submissionController';
+import { createSubmission, getSubmissionsByAssignment, getSubmissionsByStudent, downloadFile } from '../controllers/submissionController';
 import multer from 'multer';
 const upload = multer({ dest: 'uploads/' });
 const router = express.Router();
@@ -7,5 +7,6 @@ const router = express.Router();
 router.post('/', upload.single('file'), createSubmission);
 router.get('/assignment/:assignmentId', getSubmissionsByAssignment);
 router.get('/student/:studentId', getSubmissionsByStudent);
+router.get('/download/:filename', downloadFile);
 
 export default router; 

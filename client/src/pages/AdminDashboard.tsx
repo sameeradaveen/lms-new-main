@@ -5,6 +5,7 @@ import { createCourse, fetchCourses } from "@/api/courseApi"
 import { fetchAllAttendance, exportAttendance } from "@/api/attendanceApi"
 import { fetchAllLiveLinks, createLiveLink, updateLiveLink, toggleLiveLinkStatus, deleteLiveLink } from "@/api/liveClassApi"
 import { fetchAllNotifications, createNotification, deleteNotification } from "@/api/notificationApi"
+import { getFileUrl } from "@/utils/api"
 
 const modules = [
   "Credential Management",
@@ -31,7 +32,7 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState<any[]>([])
   const [userLoading, setUserLoading] = useState(false)
   const [userError, setUserError] = useState("")
-  const [newUser, setNewUser] = useState({ username: '', password: '', role: 'student' })
+  const [newUser, setNewUser] = useState({ username: '', password: '', role: 'student' as string, track: 'fullstack' as string })
   const [creating, setCreating] = useState(false)
   const [createMsg, setCreateMsg] = useState("")
 
@@ -481,7 +482,7 @@ const AdminDashboard = () => {
                 type="text"
                 placeholder="Username"
                 value={newUser.username}
-                onChange={e => setNewUser({ ...newUser, username: e.target.value })}
+                onChange={e => setNewUser(prev => ({ ...prev, username: e.target.value }))}
                 className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
                 style={{ color: '#fff', backgroundColor: '#23293b' }}
                 required
@@ -490,20 +491,31 @@ const AdminDashboard = () => {
                 type="password"
                 placeholder="Password"
                 value={newUser.password}
-                onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+                onChange={e => setNewUser(prev => ({ ...prev, password: e.target.value }))}
                 className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
                 style={{ color: '#fff', backgroundColor: '#23293b' }}
                 required
               />
               <select
                 value={newUser.role}
-                onChange={e => setNewUser({ ...newUser, role: e.target.value })}
+                onChange={e => setNewUser(prev => ({ ...prev, role: e.target.value, track: e.target.value === 'student' ? 'fullstack' : '' }))}
                 className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
                 style={{ color: '#fff', backgroundColor: '#23293b' }}
               >
                 <option value="student">Student</option>
                 <option value="admin">Admin</option>
               </select>
+              {newUser.role === 'student' && (
+                <select
+                  value={newUser.track}
+                  onChange={e => setNewUser(prev => ({ ...prev, track: e.target.value }))}
+                  className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
+                  style={{ color: '#fff', backgroundColor: '#23293b' }}
+                >
+                  <option value="fullstack">Full Stack</option>
+                  <option value="cybersecurity">Cybersecurity</option>
+                </select>
+              )}
               <button type="submit" disabled={creating} className="px-4 py-1 rounded bg-primary text-black font-semibold">Add</button>
             </form>
             {createMsg && <div className="mb-4 text-green-600">{createMsg}</div>}
@@ -515,6 +527,7 @@ const AdminDashboard = () => {
                   <tr style={{ backgroundColor: '#1a1e2a', color: '#388bff' }}>
                     <th className="py-2 px-4">Username</th>
                     <th className="py-2 px-4">Role</th>
+                    <th className="py-2 px-4">Track</th>
                     <th className="py-2 px-4">Action</th>
                   </tr>
                 </thead>
@@ -523,6 +536,7 @@ const AdminDashboard = () => {
                     <tr key={user._id} style={{ backgroundColor: '#23293b', color: '#fff' }}>
                       <td className="py-2 px-4">{user.username}</td>
                       <td className="py-2 px-4">{user.role}</td>
+                      <td className="py-2 px-4">{user.track || '-'}</td>
                       <td className="py-2 px-4">
                         <button onClick={() => handleDeleteUser(user._id)} className="px-2 py-1 rounded" style={{ backgroundColor: '#388bff', color: '#fff' }}>Delete</button>
                       </td>
@@ -582,7 +596,7 @@ const AdminDashboard = () => {
                   <span>{c.description}</span>
                   {c.pdfUrl && (
                     <div className="flex items-center gap-2 mt-1">
-                      <a href={`http://localhost:3000${c.pdfUrl}`} target="_blank" rel="noopener noreferrer" style={{ color: '#388bff' }}>
+                      <a href={getFileUrl(c.pdfUrl)} target="_blank" rel="noopener noreferrer" style={{ color: '#388bff' }}>
                         View PDF
                       </a>
                       <button onClick={() => handleDeletePdf(c._id)} className="px-2 py-1 rounded" style={{ backgroundColor: '#388bff', color: '#fff' }}>
@@ -675,7 +689,7 @@ const AdminDashboard = () => {
                     <div className="font-bold text-lg" style={{ color: '#388bff' }}>{a.title}</div>
                     <div>{a.description}</div>
                     {a.type === 'theory' && a.pdfUrl && (
-                      <a href={`http://localhost:3000${a.pdfUrl}`} target="_blank" rel="noopener noreferrer" style={{ color: '#388bff' }}>
+                      <a href={getFileUrl(a.pdfUrl)} target="_blank" rel="noopener noreferrer" style={{ color: '#388bff' }}>
                         View PDF
                       </a>
                     )}

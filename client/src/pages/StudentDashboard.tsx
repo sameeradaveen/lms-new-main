@@ -8,6 +8,7 @@ import { fetchNotifications, fetchUnreadNotifications, markNotificationAsRead, m
 import { fetchCertificates } from "@/api/certificateApi"
 import { fetchPlaygroundLogs } from "@/api/playgroundLogApi"
 import CodePlayground from "@/components/CodePlayground"
+import { getFileUrl } from "@/utils/api"
 
 const modules = [
   "Course Content",
@@ -305,7 +306,7 @@ const StudentDashboard = () => {
                   <div className="font-bold text-lg" style={{ color: '#388bff' }}>{course.title}</div>
                   <div>{course.description}</div>
                   {course.pdfUrl && (
-                    <a href={`http://localhost:3000${course.pdfUrl}`} target="_blank" rel="noopener noreferrer" style={{ color: '#388bff' }}>
+                    <a href={getFileUrl(course.pdfUrl)} target="_blank" rel="noopener noreferrer" style={{ color: '#388bff' }}>
                       View PDF
                     </a>
                   )}
@@ -394,7 +395,7 @@ const StudentDashboard = () => {
                   <div className="font-bold text-lg" style={{ color: '#388bff' }}>{a.title}</div>
                   <div>{a.description}</div>
                   {a.type === 'theory' && a.pdfUrl && (
-                    <a href={`http://localhost:3000${a.pdfUrl}`} target="_blank" rel="noopener noreferrer" style={{ color: '#388bff' }}>
+                    <a href={getFileUrl(a.pdfUrl)} target="_blank" rel="noopener noreferrer" style={{ color: '#388bff' }}>
                       View PDF
                     </a>
                   )}

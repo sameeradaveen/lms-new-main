@@ -6,11 +6,20 @@ import { Request, Response } from 'express';
 export const register = async (req: Request, res: Response) => {
   try {
     console.log('Register request received:', req.body);
-    const { username, password, role } = req.body;
+    const { username, password, role, track } = req.body;
     
     if (!username || !password || !role) {
       console.log('Missing required fields:', { username: !!username, password: !!password, role: !!role });
       return res.status(400).json({ error: 'Username, password, and role are required' });
+    }
+    
+    // Validate track for students
+    if (role === 'student' && !track) {
+      return res.status(400).json({ error: 'Track is required for students' });
+    }
+    
+    if (role === 'student' && !['fullstack', 'cybersecurity'].includes(track)) {
+      return res.status(400).json({ error: 'Track must be either "fullstack" or "cybersecurity"' });
     }
     
     // Check if user already exists
@@ -21,11 +30,21 @@ export const register = async (req: Request, res: Response) => {
     }
     
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ username, password: hashedPassword, role });
+    const userData: any = { username, password: hashedPassword, role };
+    
+    // Only add track for students
+    if (role === 'student') {
+      userData.track = track;
+    }
+    
+    const user = new User(userData);
     await user.save();
     
-    console.log('User created successfully:', { username, role });
-    return res.status(201).json({ message: 'User created successfully', user: { username, role } });
+    console.log('User created successfully:', { username, role, track });
+    return res.status(201).json({ 
+      message: 'User created successfully', 
+      user: { username, role, track: role === 'student' ? track : undefined } 
+    });
   } catch (err) {
     console.error('Error in register:', err);
     return res.status(400).json({ error: (err as Error).message });
@@ -41,7 +60,15 @@ export const login = async (req: Request, res: Response) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
-    return res.json({ token, user: { _id: user._id, username: user.username, role: user.role } });
+    return res.json({ 
+      token, 
+      user: { 
+        _id: user._id, 
+        username: user.username, 
+        role: user.role,
+        track: user.track 
+      } 
+    });
   } catch (err) {
     return res.status(400).json({ error: (err as Error).message });
   }

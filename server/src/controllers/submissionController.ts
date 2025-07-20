@@ -1,5 +1,7 @@
 import Submission from '../models/Submission';
 import { Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
@@ -41,5 +43,34 @@ export const getSubmissionsByStudent = async (req: Request, res: Response) => {
     return res.json(submissions);
   } catch (err) {
     return res.status(500).json({ error: (err as Error).message });
+  }
+};
+
+export const downloadFile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { filename } = req.params;
+    
+    if (!filename) {
+      res.status(400).json({ error: 'Filename is required' });
+      return;
+    }
+    
+    const filePath = path.join(__dirname, '..', '..', 'uploads', filename);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+    
+    // Set appropriate headers for file download
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    
+    // Stream the file
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
   }
 }; 
