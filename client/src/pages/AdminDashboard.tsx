@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { fetchUsers, createUser, deleteUser } from "@/api/userApi"
-import { createCourse, fetchCourses } from "@/api/courseApi"
+import { fetchCourses } from "@/api/courseApi"
 import { fetchAllAttendance, exportAttendance } from "@/api/attendanceApi"
-import { fetchAllLiveLinks, createLiveLink, updateLiveLink, toggleLiveLinkStatus, deleteLiveLink } from "@/api/liveClassApi"
+import { fetchAllLiveLinks, createLiveLink, toggleLiveLinkStatus, deleteLiveLink } from "@/api/liveClassApi"
 import { fetchAllNotifications, createNotification, deleteNotification } from "@/api/notificationApi"
 import { getFileUrl } from "@/utils/api"
 
@@ -32,7 +32,7 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState<any[]>([])
   const [userLoading, setUserLoading] = useState(false)
   const [userError, setUserError] = useState("")
-  const [newUser, setNewUser] = useState({ username: '', password: '', role: 'student' as string, track: 'fullstack' as string })
+  const [newUser, setNewUser] = useState({ username: '', password: '', role: 'student', track: 'fullstack' })
   const [creating, setCreating] = useState(false)
   const [createMsg, setCreateMsg] = useState("")
 
@@ -380,7 +380,7 @@ const AdminDashboard = () => {
       const result = await createUser(newUser)
       console.log('User created successfully:', result)
       setCreateMsg("User created successfully!")
-      setNewUser({ username: '', password: '', role: 'student' })
+      setNewUser({ username: '', password: '', role: 'student', track: 'fullstack' })
       // Refresh user list
       setUserLoading(true)
       const updated = await fetchUsers()

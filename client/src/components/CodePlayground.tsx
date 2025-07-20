@@ -8,7 +8,7 @@ import { sql } from '@codemirror/lang-sql';
 import { html } from '@codemirror/lang-html';
 import { css } from '@codemirror/lang-css';
 import { dracula } from '@uiw/codemirror-theme-dracula';
-import { fetchPlaygroundLogs, createPlaygroundLog } from '@/api/playgroundLogApi';
+import { fetchPlaygroundLogs, createPlaygroundLog, deletePlaygroundLogs } from '@/api/playgroundLogApi';
 
 interface CodePlaygroundProps {
   userId: string;
@@ -25,6 +25,8 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ userId, assignmentId, o
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [clearingHistory, setClearingHistory] = useState(false);
+  const [waitingForInput, setWaitingForInput] = useState(false);
 
   // Language configurations
   const languages = {
@@ -198,6 +200,21 @@ body {
     }
   }, [language]);
 
+  // Add keyboard shortcut for clear (Ctrl+Shift+C)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && event.key === 'C') {
+        event.preventDefault();
+        clearCode();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [language]);
+
   const loadLogs = async () => {
     try {
       setLoading(true);
@@ -215,17 +232,24 @@ body {
     setOutput('');
 
     try {
+      console.log('Running code with language:', language);
+      console.log('Code content:', code.substring(0, 100) + '...');
+      
+      const requestBody = {
+        language: language,
+        code: code,
+        input: input
+      };
+      
+      console.log('Request body:', requestBody);
+
       const response = await fetch('/api/codeexecution/execute', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          language: language,
-          code: code,
-          input: input
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -233,7 +257,19 @@ body {
       }
 
       const result = await response.json();
-      setOutput(result.output);
+      
+      // Check if the program is waiting for input
+      if (result.output.includes('[INPUT REQUIRED]')) {
+        setWaitingForInput(true);
+        setOutput(result.output.replace('[INPUT REQUIRED] Please provide input and run the code again.', ''));
+        // Clear input field when waiting for new input
+        setInput('');
+      } else {
+        setWaitingForInput(false);
+        setOutput(result.output);
+        // Clear input field after successful execution
+        setInput('');
+      }
 
       // Save to playground logs
       await createPlaygroundLog({
@@ -260,10 +296,36 @@ body {
     }
   };
 
-  const clearCode = () => {
-    setCode(languages[language as keyof typeof languages].template);
-    setInput('');
-    setOutput('');
+  const clearCode = async () => {
+    console.log('Clear button clicked!');
+    
+    // Ask for confirmation before clearing history
+    if (window.confirm('Are you sure you want to clear all playground history? This action cannot be undone.')) {
+      console.log('Clearing playground history...');
+      setClearingHistory(true);
+      
+      try {
+        // Delete logs from database
+        await deletePlaygroundLogs(userId);
+        
+        // Clear the logs state
+        setLogs([]);
+        
+        console.log('Playground history cleared successfully from database');
+        
+        // Show a brief success message
+        setTimeout(() => {
+          alert('Playground history cleared successfully!');
+        }, 100);
+      } catch (error) {
+        console.error('Failed to clear playground history:', error);
+        alert('Failed to clear playground history. Please try again.');
+      } finally {
+        setClearingHistory(false);
+      }
+    } else {
+      console.log('Clear operation cancelled by user');
+    }
   };
 
   const getLanguageExtension = () => {
@@ -319,10 +381,16 @@ body {
             )}
             <button
               onClick={clearCode}
-              className="px-4 py-2 rounded font-semibold"
-              style={{ backgroundColor: '#6b7280', color: '#fff' }}
+              disabled={clearingHistory}
+              className="px-4 py-2 rounded font-semibold hover:bg-red-600 transition-colors"
+              style={{ 
+                backgroundColor: clearingHistory ? '#6b7280' : '#ef4444', 
+                color: '#fff', 
+                cursor: clearingHistory ? 'not-allowed' : 'pointer' 
+              }}
+              title="Clear all playground history (Ctrl+Shift+C)"
             >
-              🗑️ Clear
+              {clearingHistory ? '🔄 Clearing...' : '🗑️ Clear History'}
             </button>
           </div>
         </div>
@@ -348,27 +416,47 @@ body {
             </div>
           </div>
 
-          {/* Input/Output */}
-          <div className="flex-1 flex">
-            <div className="flex-1 p-4">
-              <h3 className="text-lg font-semibold mb-2" style={{ color: '#388bff' }}>
-                Input
-              </h3>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Enter input for your code..."
-                className="w-full h-32 p-3 rounded border border-gray-600 bg-gray-800 text-white resize-none"
-              />
+          {/* Output */}
+          <div className="flex-1 p-4">
+            <h3 className="text-lg font-semibold mb-2" style={{ color: '#388bff' }}>
+              Output
+            </h3>
+            <div className="w-full h-64 p-3 rounded border border-gray-600 bg-gray-800 text-white overflow-auto">
+              <pre className="whitespace-pre-wrap">{output || 'Output will appear here...'}</pre>
             </div>
-            <div className="flex-1 p-4">
-              <h3 className="text-lg font-semibold mb-2" style={{ color: '#388bff' }}>
-                Output
-              </h3>
-              <div className="w-full h-32 p-3 rounded border border-gray-600 bg-gray-800 text-white overflow-auto">
-                <pre className="whitespace-pre-wrap">{output || 'Output will appear here...'}</pre>
+            
+            {/* Input field that appears when program is waiting for input */}
+            {waitingForInput && (
+              <div className="mt-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-yellow-400">📝 Enter your input:</span>
+                  <span className="text-gray-400 text-sm">(Input field will be cleared after each run)</span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Type your input here..."
+                    className="flex-1 p-2 rounded border border-gray-600 bg-gray-800 text-white"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        runCode();
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={runCode}
+                    disabled={isRunning}
+                    className="px-4 py-2 rounded font-semibold"
+                    style={{ backgroundColor: '#388bff', color: '#fff' }}
+                  >
+                    {isRunning ? 'Running...' : 'Submit'}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* HTML/CSS Preview */}

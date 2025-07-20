@@ -31,4 +31,14 @@ export async function fetchAllPlaygroundLogs() {
   });
   if (!res.ok) throw new Error((await res.json()).error || 'Failed to fetch all playground logs');
   return res.json();
+}
+
+export async function deletePlaygroundLogs(userId: string) {
+  const token = localStorage.getItem('token');
+  const res = await fetch(`/api/playgroundlogs/user/${userId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error((await res.json()).error || 'Failed to delete playground logs');
+  return res.json();
 } 

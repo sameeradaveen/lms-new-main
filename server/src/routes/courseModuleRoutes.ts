@@ -1,7 +1,16 @@
 import express from 'express';
 import { create, getAll, getById, update, remove, deletePdf } from '../controllers/courseModuleController';
 import multer from 'multer';
-const upload = multer({ dest: 'uploads/' });
+import path from 'path';
+import fs from 'fs';
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const upload = multer({ dest: uploadsDir });
 const router = express.Router();
 
 router.post('/', upload.single('pdf'), create);

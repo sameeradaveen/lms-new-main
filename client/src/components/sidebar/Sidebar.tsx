@@ -1,4 +1,3 @@
-import SidebarButton from "@/components/sidebar/sidebar-views/SidebarButton"
 import { useAppContext } from "@/context/AppContext"
 import { useSocket } from "@/context/SocketContext"
 import { useViews } from "@/context/ViewContext"
@@ -21,6 +20,7 @@ function Sidebar() {
         viewComponents,
         viewIcons,
         setIsSidebarOpen,
+        setActiveView,
     } = useViews()
     const { minHeightReached } = useResponsive()
     const { activityState, setActivityState } = useAppContext()
@@ -42,6 +42,15 @@ function Sidebar() {
         }
     }
 
+    const handleViewClick = (viewName: VIEWS) => {
+        if (viewName === activeView) {
+            setIsSidebarOpen(!isSidebarOpen)
+        } else {
+            setIsSidebarOpen(true)
+            setActiveView(viewName)
+        }
+    }
+
     return (
         <aside className="flex w-full md:h-full md:max-h-full md:min-h-full md:w-auto">
             <div
@@ -52,30 +61,77 @@ function Sidebar() {
                     },
                 )}
             >
-                <SidebarButton
-                    viewName={VIEWS.FILES}
-                    icon={viewIcons[VIEWS.FILES]}
-                />
-                <SidebarButton
-                    viewName={VIEWS.CHATS}
-                    icon={viewIcons[VIEWS.CHATS]}
-                />
-                <SidebarButton
-                    viewName={VIEWS.COPILOT}
-                    icon={viewIcons[VIEWS.COPILOT]}
-                />
-                <SidebarButton
-                    viewName={VIEWS.RUN}
-                    icon={viewIcons[VIEWS.RUN]}
-                />
-                <SidebarButton
-                    viewName={VIEWS.CLIENTS}
-                    icon={viewIcons[VIEWS.CLIENTS]}
-                />
-                <SidebarButton
-                    viewName={VIEWS.SETTINGS}
-                    icon={viewIcons[VIEWS.SETTINGS]}
-                />
+                <div className="relative flex flex-col items-center">
+                    <button
+                        onClick={() => handleViewClick(VIEWS.FILES)}
+                        onMouseEnter={() => setShowTooltip(true)}
+                        className="flex items-center justify-center rounded p-1.5 transition-colors duration-200 ease-in-out hover:bg-[#3D404A]"
+                        data-tooltip-id="tooltip-files"
+                        data-tooltip-content="Files"
+                    >
+                        <div className="flex items-center justify-center">{viewIcons[VIEWS.FILES]}</div>
+                    </button>
+                    {showTooltip && (
+                        <Tooltip
+                            id="tooltip-files"
+                            place="right"
+                            offset={25}
+                            className="!z-50"
+                            style={tooltipStyles}
+                            noArrow={false}
+                            positionStrategy="fixed"
+                            float={true}
+                        />
+                    )}
+                </div>
+
+                <div className="relative flex flex-col items-center">
+                    <button
+                        onClick={() => handleViewClick(VIEWS.CLIENTS)}
+                        onMouseEnter={() => setShowTooltip(true)}
+                        className="flex items-center justify-center rounded p-1.5 transition-colors duration-200 ease-in-out hover:bg-[#3D404A]"
+                        data-tooltip-id="tooltip-clients"
+                        data-tooltip-content="Clients"
+                    >
+                        <div className="flex items-center justify-center">{viewIcons[VIEWS.CLIENTS]}</div>
+                    </button>
+                    {showTooltip && (
+                        <Tooltip
+                            id="tooltip-clients"
+                            place="right"
+                            offset={25}
+                            className="!z-50"
+                            style={tooltipStyles}
+                            noArrow={false}
+                            positionStrategy="fixed"
+                            float={true}
+                        />
+                    )}
+                </div>
+
+                <div className="relative flex flex-col items-center">
+                    <button
+                        onClick={() => handleViewClick(VIEWS.SETTINGS)}
+                        onMouseEnter={() => setShowTooltip(true)}
+                        className="flex items-center justify-center rounded p-1.5 transition-colors duration-200 ease-in-out hover:bg-[#3D404A]"
+                        data-tooltip-id="tooltip-settings"
+                        data-tooltip-content="Settings"
+                    >
+                        <div className="flex items-center justify-center">{viewIcons[VIEWS.SETTINGS]}</div>
+                    </button>
+                    {showTooltip && (
+                        <Tooltip
+                            id="tooltip-settings"
+                            place="right"
+                            offset={25}
+                            className="!z-50"
+                            style={tooltipStyles}
+                            noArrow={false}
+                            positionStrategy="fixed"
+                            float={true}
+                        />
+                    )}
+                </div>
 
                 {/* Button to change activity state coding or drawing */}
                 <div className="flex h-fit items-center justify-center">

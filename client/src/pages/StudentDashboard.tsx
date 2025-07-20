@@ -2,11 +2,10 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { fetchCourses } from "@/api/courseApi"
 import { checkInAttendance, fetchAttendanceByUser } from "@/api/attendanceApi"
-import { fetchAssignments, submitAssignment } from "@/api/assignmentApi"
+import { fetchAssignments } from "@/api/assignmentApi"
 import { fetchLiveLinks } from "@/api/liveClassApi"
 import { fetchNotifications, fetchUnreadNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "@/api/notificationApi"
 import { fetchCertificates } from "@/api/certificateApi"
-import { fetchPlaygroundLogs } from "@/api/playgroundLogApi"
 import CodePlayground from "@/components/CodePlayground"
 import { getFileUrl } from "@/utils/api"
 
@@ -68,16 +67,7 @@ const StudentDashboard = () => {
   const todayRecord = getTodayAttendance();
 
   // Assignments
-  const [assignments, setAssignments] = useState<any[]>([]);
-  const [submittingAssignmentId, setSubmittingAssignmentId] = useState<string | null>(null);
-  const [submissionMsg, setSubmissionMsg] = useState('');
-  const [submissionError, setSubmissionError] = useState('');
-  const [submissionForm, setSubmissionForm] = useState<{ [key: string]: { answerText: string; file: File | null } }>({});
-  const [assnLoading, setAssnLoading] = useState(false)
-  const [assnError, setAssnError] = useState("")
-  const [submission, setSubmission] = useState("")
-  const [submitting, setSubmitting] = useState(false)
-  const [submitMsg, setSubmitMsg] = useState("")
+  const [assignments, setAssignments] = useState<any[]>([])
   // Live Links
   const [liveLinks, setLiveLinks] = useState<any[]>([])
   const [liveLoading, setLiveLoading] = useState(false)
@@ -91,10 +81,6 @@ const StudentDashboard = () => {
   const [certificates, setCertificates] = useState<any[]>([])
   const [certLoading, setCertLoading] = useState(false)
   const [certError, setCertError] = useState("")
-  // Playground Logs
-  const [logs, setLogs] = useState<any[]>([])
-  const [logLoading, setLogLoading] = useState(false)
-  const [logError, setLogError] = useState("")
 
   useEffect(() => {
     if (active === "Course Content") {
@@ -126,11 +112,9 @@ const StudentDashboard = () => {
   // Fetch data for each module
   useEffect(() => {
     if (active === "Assignments") {
-      setAssnLoading(true)
       fetchAssignments()
         .then(setAssignments)
-        .catch(err => setAssnError(err.message))
-        .finally(() => setAssnLoading(false))
+        .catch(err => console.error('Error fetching assignments:', err))
     } else if (active === "Live Class Links") {
       setLiveLoading(true)
       fetchLiveLinks()
@@ -162,12 +146,6 @@ const StudentDashboard = () => {
         .then(setCertificates)
         .catch(err => setCertError(err.message))
         .finally(() => setCertLoading(false))
-    } else if (active === "Playground") {
-      setLogLoading(true)
-      fetchPlaygroundLogs(user._id)
-        .then(setLogs)
-        .catch(err => setLogError(err.message))
-        .finally(() => setLogLoading(false))
     }
   }, [active])
 
@@ -233,33 +211,42 @@ const StudentDashboard = () => {
   };
 
   // Assignment submission handler
-  const handleAssignmentSubmit = async (assignmentId: string, type: string) => {
-    setSubmittingAssignmentId(assignmentId);
-    setSubmissionMsg('');
-    setSubmissionError('');
-    try {
-      const formData = new FormData();
-      formData.append('assignment', assignmentId);
-      formData.append('student', user._id); // assuming user is available in context
-      if (submissionForm[assignmentId]?.answerText) {
-        formData.append('answerText', submissionForm[assignmentId].answerText);
+  const handleAssignmentSubmit = async (assignmentId: string) => {
+    const fileInput = document.createElement('input')
+    fileInput.type = 'file'
+    fileInput.accept = '.pdf,.doc,.docx,.txt,.zip,.rar'
+    fileInput.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (file) {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('assignmentId', assignmentId)
+        formData.append('studentId', user._id)
+        
+        try {
+          const response = await fetch('/api/submissions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: formData
+          })
+          
+          if (response.ok) {
+            alert('Assignment submitted successfully!')
+            // Refresh assignments
+            fetchAssignments()
+          } else {
+            alert('Failed to submit assignment')
+          }
+        } catch (error) {
+          console.error('Error submitting assignment:', error)
+          alert('Error submitting assignment')
+        }
       }
-      if (submissionForm[assignmentId]?.file) {
-        formData.append('file', submissionForm[assignmentId].file);
-      }
-      const res = await fetch('/api/submissions', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!res.ok) throw new Error((await res.json()).error || 'Failed to submit assignment');
-      setSubmissionMsg('Assignment submitted!');
-      setSubmissionForm(prev => ({ ...prev, [assignmentId]: { answerText: '', file: null } }));
-    } catch (err: any) {
-      setSubmissionError(err.message);
-    } finally {
-      setSubmittingAssignmentId(null);
     }
-  };
+    fileInput.click()
+  }
 
   // Logout handler
   const handleLogout = () => {
@@ -267,16 +254,6 @@ const StudentDashboard = () => {
     localStorage.removeItem('user');
     navigate('/login');
   }
-
-  const handleSubmissionFormChange = (assignmentId: string, field: 'answerText' | 'file', value: any) => {
-    setSubmissionForm(prev => ({
-      ...prev,
-      [assignmentId]: {
-        ...prev[assignmentId],
-        [field]: value,
-      },
-    }));
-  };
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -399,47 +376,13 @@ const StudentDashboard = () => {
                       View PDF
                     </a>
                   )}
-                  <form
-                    onSubmit={e => {
-                      e.preventDefault();
-                      handleAssignmentSubmit(a._id, a.type);
-                    }}
-                    className="flex flex-col gap-2 mt-2"
+                  <button 
+                    onClick={() => handleAssignmentSubmit(a._id)}
+                    className="mt-2 px-6 py-2 rounded font-semibold shadow" 
+                    style={{ backgroundColor: '#388bff', color: '#fff' }}
                   >
-                    {a.type === 'theory' && (
-                      <>
-                        <textarea
-                          placeholder="Your answer (optional)"
-                          value={submissionForm[a._id]?.answerText || ''}
-                          onChange={e => handleSubmissionFormChange(a._id, 'answerText', e.target.value)}
-                          className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
-                          style={{ color: '#fff', backgroundColor: '#23293b' }}
-                        />
-                        <input
-                          type="file"
-                          accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                          onChange={e => handleSubmissionFormChange(a._id, 'file', e.target.files?.[0] || null)}
-                          className="rounded-md border px-3 py-2"
-                          style={{ color: '#fff', backgroundColor: '#23293b' }}
-                        />
-                      </>
-                    )}
-                    {a.type === 'coding' && (
-                      <textarea
-                        placeholder="Paste your code here"
-                        value={submissionForm[a._id]?.answerText || ''}
-                        onChange={e => handleSubmissionFormChange(a._id, 'answerText', e.target.value)}
-                        className="rounded-md border px-3 py-2 focus:outline-none bg-background text-white border-[#388bff55]"
-                        style={{ color: '#fff', backgroundColor: '#23293b' }}
-                        required
-                      />
-                    )}
-                    {submissionError && submittingAssignmentId === a._id && <div className="text-red-500">{submissionError}</div>}
-                    {submissionMsg && submittingAssignmentId === a._id && <div className="text-green-500">{submissionMsg}</div>}
-                    <button type="submit" className="mt-2 px-6 py-2 rounded font-semibold shadow" style={{ backgroundColor: '#388bff', color: '#fff' }} disabled={submittingAssignmentId === a._id}>
-                      {submittingAssignmentId === a._id ? 'Submitting...' : 'Submit Assignment'}
-                    </button>
-                  </form>
+                    Submit Assignment
+                  </button>
                 </li>
               ))}
             </ul>

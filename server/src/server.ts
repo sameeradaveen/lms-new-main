@@ -38,7 +38,7 @@ if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
 }
 
-// Serve uploads with enhanced error handling and logging
+// Serve uploads with proper CORS and caching headers
 app.use('/uploads', express.static(uploadsPath, {
   setHeaders: (res, path) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -46,46 +46,8 @@ app.use('/uploads', express.static(uploadsPath, {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
     res.setHeader('Cache-Control', 'public, max-age=3600');
   },
-  fallthrough: false,
   index: false
 }));
-
-// Add comprehensive logging for file access
-app.use('/uploads', (req, res, next) => {
-  const filePath = path.join(uploadsPath, req.path);
-  console.log('📄 File access request:', {
-    path: req.path,
-    fullPath: filePath,
-    method: req.method,
-    userAgent: req.get('User-Agent'),
-    timestamp: new Date().toISOString()
-  });
-  
-  if (!fs.existsSync(filePath)) {
-    console.warn('❌ File not found:', {
-      requestedPath: req.path,
-      fullPath: filePath,
-      availableFiles: fs.readdirSync(uploadsPath)
-    });
-    return res.status(404).json({ 
-      error: 'File not found', 
-      path: req.path,
-      fullPath: filePath,
-      availableFiles: fs.readdirSync(uploadsPath)
-    });
-  }
-  
-  // Check file permissions
-  try {
-    fs.accessSync(filePath, fs.constants.R_OK);
-  } catch (err) {
-    console.error('❌ File permission error:', err);
-    return res.status(403).json({ error: 'File access denied' });
-  }
-  
-  console.log('✅ File access granted:', req.path);
-  next();
-});
 
 // Connect to MongoDB with fallback options
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -377,14 +339,24 @@ app.get('/api/files/debug', (req: Request, res: Response) => {
         size: stats.size,
         created: stats.birthtime,
         modified: stats.mtime,
-        permissions: stats.mode.toString(8)
+        permissions: stats.mode.toString(8),
+        path: filePath
       };
     });
     
     res.json({
       uploadsDirectory: uploadsPath,
       totalFiles: files.length,
-      files: fileStats
+      files: fileStats,
+      directoryExists: fs.existsSync(uploadsPath),
+      directoryReadable: (() => {
+        try {
+          fs.accessSync(uploadsPath, fs.constants.R_OK);
+          return true;
+        } catch {
+          return false;
+        }
+      })()
     });
   } catch (err) {
     console.error('❌ File debug error:', err);
@@ -406,17 +378,19 @@ app.get('/api/files/verify/:filename', (req: Request, res: Response) => {
     
     if (exists) {
       const stats = fs.statSync(filePath);
-      res.json({
+      return res.json({
         exists: true,
         filename,
         size: stats.size,
         created: stats.birthtime,
         modified: stats.mtime,
         permissions: stats.mode.toString(8),
-        path: filePath
+        path: filePath,
+        url: `/uploads/${filename}`,
+        fullUrl: `http://localhost:3000/uploads/${filename}`
       });
     } else {
-      res.json({
+      return res.json({
         exists: false,
         filename,
         path: filePath,
@@ -425,7 +399,7 @@ app.get('/api/files/verify/:filename', (req: Request, res: Response) => {
     }
   } catch (err) {
     console.error('❌ File verification error:', err);
-    res.status(500).json({ error: (err as Error).message });
+    return res.status(500).json({ error: (err as Error).message });
   }
 });
 

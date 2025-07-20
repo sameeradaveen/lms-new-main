@@ -1,7 +1,7 @@
 import { useAppContext } from "@/context/AppContext"
 import useWindowDimensions from "@/hooks/useWindowDimensions"
 import { useCallback, useEffect } from "react"
-import { HistoryEntry, TLRecord, Tldraw, useEditor } from "tldraw"
+import { Tldraw, useEditor } from "tldraw"
 
 function DrawingEditor() {
     const { isMobile } = useWindowDimensions()
@@ -23,7 +23,7 @@ function LocalEditor() {
     const { drawingData, setDrawingData } = useAppContext()
 
     const handleChangeEvent = useCallback(
-        (change: HistoryEntry<TLRecord>) => {
+        () => {
             // Update the drawing data in the context (local only)
             setDrawingData(editor.store.getSnapshot())
         },

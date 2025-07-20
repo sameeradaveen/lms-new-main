@@ -27,4 +27,16 @@ export const getByUser = async (req: Request, res: Response) => {
   } catch (err) {
     return res.status(400).json({ error: (err as Error).message });
   }
+};
+
+export const deleteByUser = async (req: Request, res: Response) => {
+  try {
+    const result = await PlaygroundLog.deleteMany({ user: req.params.userId });
+    return res.json({ 
+      message: `Deleted ${result.deletedCount} playground logs for user ${req.params.userId}`,
+      deletedCount: result.deletedCount 
+    });
+  } catch (err) {
+    return res.status(500).json({ error: (err as Error).message });
+  }
 }; 
